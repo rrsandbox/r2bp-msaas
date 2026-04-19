@@ -19,6 +19,7 @@
     "db:prepare-local": "npm run db:deploy && npm run db:seed && npm run db:check-local",
     "db:setup-local": "npm run db:prepare-local",
     "audit:retention": "tsx --env-file=.env scripts/audit-retention.ts",
+    "version:check-ledger": "tsx scripts/version-ledger-check.ts",
     "supabase:start": "cd D:\\Supabase_Db\\supabase && npx supabase start",
     "supabase:stop": "cd D:\\Supabase_Db\\supabase && npx supabase stop",
     "supabase:status": "cd D:\\Supabase_Db\\supabase && npx supabase status",

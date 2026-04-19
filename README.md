@@ -53,6 +53,15 @@ http://127.0.0.1:54324/view/LYq3e6Hm7oSeMhZme9oXrb
 - Colecao REST Client unificada (smoke test): [docs/api.http](docs/api.http)
 - Guia de troubleshooting de testes de API: [docs/api-testing.md](docs/api-testing.md)
 - API de Sistema (status e setup): [docs/system-api.md](docs/system-api.md)
+- Ledger oficial de versao e compatibilidade do baseline: [VERSION-CONTROL.md](VERSION-CONTROL.md)
+
+## Controle de versao do baseline
+
+Para validar rapidamente se o ledger de compatibilidade esta consistente:
+
+```bash
+npm run version:check-ledger
+```
 
 ## Prisma config
 

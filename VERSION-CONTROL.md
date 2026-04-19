@@ -132,3 +132,4 @@ Each derived project should add one record here when created.
 - `README.md` for project-level documentation.
 - `docs/` for endpoint and operational runbooks.
 - `VERSION-CONTROL.md` (this file) as the compatibility ledger.
+- `VERSION-CONTROL-MANUAL.md` for operational instructions on how to fill and maintain this ledger.

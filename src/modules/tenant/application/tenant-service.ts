@@ -4,7 +4,14 @@ import { prisma } from "@/infra/db/prisma";
 import { AppError } from "@/lib/errors/app-error";
 import { ErrorCodes } from "@/lib/errors/error-codes";
 import { slugify } from "@/lib/utils/slugify";
-import { createTenantSchema, type CreateTenantInput, updateTenantSchema, type UpdateTenantInput } from "@/lib/validation/tenant/tenant.schema";
+import {
+  createTenantSchema,
+  type CreateTenantInput,
+  type TenantLegalProfileInput,
+  tenantLegalProfileSchema,
+  updateTenantSchema,
+  type UpdateTenantInput,
+} from "@/lib/validation/tenant/tenant.schema";
 
 type TenantScope = {
   role: RoleKey;
@@ -26,6 +33,9 @@ type TenantListItem = {
   slug: string;
   status: string;
   onboardingStatus: string;
+  personType: "PF" | "PJ" | "N/A";
+  registrationId: string | null;
+  legalProfile: TenantLegalProfileInput | null;
   admins: number;
   createdAt: Date;
 };
@@ -40,21 +50,59 @@ function normalizePagination(pagination?: TenantPagination) {
   };
 }
 
+function extractRegistration(legalProfile: Prisma.JsonValue | null): {
+  personType: "PF" | "PJ" | "N/A";
+  registrationId: string | null;
+  parsedLegalProfile: TenantLegalProfileInput | null;
+} {
+  const parsed = tenantLegalProfileSchema.safeParse(legalProfile);
+
+  if (!parsed.success) {
+    return {
+      personType: "N/A",
+      registrationId: null,
+      parsedLegalProfile: null,
+    };
+  }
+
+  const profile = parsed.data;
+
+  if (profile.personType === "PF") {
+    return {
+      personType: "PF",
+      registrationId: profile.qualification.document.number,
+      parsedLegalProfile: profile,
+    };
+  }
+
+  return {
+    personType: "PJ",
+    registrationId: profile.qualification.document.number,
+    parsedLegalProfile: profile,
+  };
+}
+
 function mapTenantItem(tenant: {
   id: string;
   name: string;
   slug: string;
   status: string;
   onboardingStatus: string;
+  legalProfile: Prisma.JsonValue | null;
   createdAt: Date;
   memberships: Array<{ id: string }>;
 }): TenantListItem {
+  const registration = extractRegistration(tenant.legalProfile);
+
   return {
     id: tenant.id,
     name: tenant.name,
     slug: tenant.slug,
     status: tenant.status,
     onboardingStatus: tenant.onboardingStatus,
+    personType: registration.personType,
+    registrationId: registration.registrationId,
+    legalProfile: registration.parsedLegalProfile,
     admins: tenant.memberships.length,
     createdAt: tenant.createdAt,
   };
@@ -73,7 +121,6 @@ export async function listTenants(scope: TenantScope) {
       createdAt: "desc",
     },
     include: {
-      
       memberships: {
         where: {
           role: {

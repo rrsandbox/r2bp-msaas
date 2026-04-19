@@ -16,6 +16,81 @@ function readText(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
 }
 
+function digitsOnly(value: string) {
+  return value.replace(/\D/g, "");
+}
+
+function buildTenantProfilesFromForm(formData: FormData) {
+  const personType = readText(formData, "personType") === "PJ" ? "PJ" : "PF";
+
+  const legalProfile =
+    personType === "PF"
+      ? {
+          personType: "PF" as const,
+          qualification: {
+            fullName: readText(formData, "pfFullName"),
+            document: {
+              type: "CPF" as const,
+              number: digitsOnly(readText(formData, "pfCpf")),
+            },
+            birthDate: readText(formData, "pfBirthDate"),
+            email: readText(formData, "pfEmail").toLowerCase(),
+            phone: readText(formData, "pfPhone"),
+            occupation: readText(formData, "pfOccupation"),
+            identityDocument: readText(formData, "pfIdentityDocument") || undefined,
+          },
+        }
+      : {
+          personType: "PJ" as const,
+          qualification: {
+            corporateName: readText(formData, "pjCorporateName"),
+            tradeName: readText(formData, "pjTradeName") || undefined,
+            document: {
+              type: "CNPJ" as const,
+              number: digitsOnly(readText(formData, "pjCnpj")),
+            },
+            email: readText(formData, "pjEmail").toLowerCase(),
+            phone: readText(formData, "pjPhone"),
+            mainActivity: readText(formData, "pjMainActivity"),
+          },
+          legalRepresentative: {
+            fullName: readText(formData, "repFullName"),
+            document: {
+              type: "CPF" as const,
+              number: digitsOnly(readText(formData, "repCpf")),
+            },
+            birthDate: readText(formData, "repBirthDate"),
+            email: readText(formData, "repEmail").toLowerCase(),
+            phone: readText(formData, "repPhone"),
+            occupation: readText(formData, "repOccupation"),
+            identityDocument: readText(formData, "repIdentityDocument") || undefined,
+          },
+        };
+
+  const adminProfile =
+    personType === "PF"
+      ? {
+          personType: "PF",
+          ...legalProfile.qualification,
+        }
+      : {
+          personType: "PF",
+          ...legalProfile.legalRepresentative,
+        };
+
+  const billingProfile = {
+    contactEmail: legalProfile.qualification.email,
+    contactPhone: legalProfile.qualification.phone,
+    personType,
+  };
+
+  return {
+    legalProfile,
+    adminProfile,
+    billingProfile,
+  };
+}
+
 function readReturnTo(formData: FormData) {
   const candidate = readText(formData, "returnTo");
 
@@ -46,10 +121,14 @@ export async function createTenantAction(formData: FormData) {
 
     const name = readText(formData, "name");
     const slug = readText(formData, "slug");
+    const { legalProfile, adminProfile, billingProfile } = buildTenantProfilesFromForm(formData);
 
     const tenant = await createTenant({
       name,
       slug: slug || undefined,
+      legalProfile,
+      adminProfile,
+      billingProfile,
     });
 
     await recordAuditEvent({
@@ -87,6 +166,11 @@ export async function updateTenantAction(formData: FormData) {
     const name = readText(formData, "name");
     const slug = readText(formData, "slug");
     const status = readText(formData, "status");
+    const shouldUpdateProfiles = Boolean(readText(formData, "personType"));
+
+    const profilePayload = shouldUpdateProfiles
+      ? buildTenantProfilesFromForm(formData)
+      : undefined;
 
     const tenant = await updateTenant(
       tenantId,
@@ -94,6 +178,9 @@ export async function updateTenantAction(formData: FormData) {
         name: name || undefined,
         slug: slug || undefined,
         status: status ? (status as "active" | "inactive" | "archived") : undefined,
+        legalProfile: profilePayload?.legalProfile,
+        adminProfile: profilePayload?.adminProfile,
+        billingProfile: profilePayload?.billingProfile,
       },
       {
         role: context.role,

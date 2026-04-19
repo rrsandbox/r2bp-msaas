@@ -5,6 +5,7 @@
 @permissionId = permission-id
 @eventId = event-id
 @commentId = comment-id
+@tenantId = tenant-id
 
 # Dica de setup local:
 # 1) Rode npx supabase start
@@ -130,8 +131,95 @@ Cookie: {{cookie}}
   "commentId": "{{commentId}}"
 }
 
+### [14] Tenants - listar
+GET {{host}}/api/tenants
+Cookie: {{cookie}}
+
+### [15] Tenants - criar PF
+POST {{host}}/api/tenants
+Content-Type: application/json
+Cookie: {{cookie}}
+
+{
+  "name": "Cliente PF API",
+  "slug": "cliente-pf-api",
+  "legalProfile": {
+    "personType": "PF",
+    "qualification": {
+      "fullName": "Cliente PF API",
+      "document": {
+        "type": "CPF",
+        "number": "12345678901"
+      },
+      "birthDate": "1992-08-14",
+      "email": "cliente.pf.api@example.com",
+      "phone": "11991112222",
+      "occupation": "Consultor"
+    }
+  },
+  "billingProfile": {
+    "contactEmail": "cliente.pf.api@example.com",
+    "contactPhone": "11991112222",
+    "personType": "PF"
+  },
+  "adminProfile": {
+    "personType": "PF",
+    "fullName": "Cliente PF API",
+    "email": "cliente.pf.api@example.com"
+  }
+}
+
+### [16] Tenants - atualizar para PJ com representante
+PATCH {{host}}/api/tenants/{{tenantId}}
+Content-Type: application/json
+Cookie: {{cookie}}
+
+{
+  "name": "Cliente PJ API",
+  "status": "active",
+  "legalProfile": {
+    "personType": "PJ",
+    "qualification": {
+      "corporateName": "Cliente PJ API LTDA",
+      "tradeName": "Cliente PJ",
+      "document": {
+        "type": "CNPJ",
+        "number": "12345678000199"
+      },
+      "email": "contato@clientepjapi.com",
+      "phone": "1133334444",
+      "mainActivity": "Servicos B2B"
+    },
+    "legalRepresentative": {
+      "fullName": "Representante API",
+      "document": {
+        "type": "CPF",
+        "number": "98765432100"
+      },
+      "birthDate": "1985-03-22",
+      "email": "representante@clientepjapi.com",
+      "phone": "11994445555",
+      "occupation": "Administrador"
+    }
+  },
+  "billingProfile": {
+    "contactEmail": "contato@clientepjapi.com",
+    "contactPhone": "1133334444",
+    "personType": "PJ"
+  },
+  "adminProfile": {
+    "personType": "PF",
+    "fullName": "Representante API",
+    "email": "representante@clientepjapi.com"
+  }
+}
+
+### [17] Tenants - remover
+DELETE {{host}}/api/tenants/{{tenantId}}
+Cookie: {{cookie}}
+
 # Uso:
 # 1) Preencha SESSION_TOKEN
 # 2) Opcional: ajuste host
-# 3) Atualize userId/featureId/permissionId/eventId conforme seu ambiente
+# 3) Atualize userId/featureId/permissionId/eventId/commentId/tenantId conforme seu ambiente
 # 4) Execute em ordem para smoke test manual

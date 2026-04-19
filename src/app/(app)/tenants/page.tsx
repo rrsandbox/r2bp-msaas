@@ -5,12 +5,17 @@ import { createTenantAction, updateTenantAction } from "@/app/(app)/tenants/acti
 import { TenantFlashToast } from "@/app/(app)/tenants/tenant-flash-toast";
 import { DeleteTenantButton } from "@/app/(app)/tenants/delete-tenant-button";
 import {
+  TenantCreateForm,
+  TenantEditForm,
+  type TenantFormInitialValues,
+} from "@/app/(app)/tenants/tenant-create-form";
+import type { TenantLegalProfileInput } from "@/lib/validation/tenant/tenant.schema";
+import {
   PageHeader,
   Card,
   CardHeader,
   CardBody,
   CardFooter,
-  FormField,
   DataTable,
   DataTableHeader,
   DataTableBody,
@@ -38,9 +43,61 @@ type TenantItem = {
   slug: string;
   status: string;
   onboardingStatus?: string;
+  personType: "PF" | "PJ" | "N/A";
+  registrationId: string | null;
+  legalProfile: TenantLegalProfileInput | null;
   admins: number;
   createdAt: Date;
 };
+
+function mapTenantToInitialValues(tenant: TenantItem): TenantFormInitialValues {
+  const legalProfile = tenant.legalProfile;
+
+  if (!legalProfile) {
+    return {
+      tenantId: tenant.id,
+      name: tenant.name,
+      slug: tenant.slug,
+      personType: "PF",
+    };
+  }
+
+  if (legalProfile.personType === "PF") {
+    return {
+      tenantId: tenant.id,
+      name: tenant.name,
+      slug: tenant.slug,
+      personType: "PF",
+      pfFullName: legalProfile.qualification.fullName,
+      pfCpf: legalProfile.qualification.document.number,
+      pfBirthDate: legalProfile.qualification.birthDate,
+      pfEmail: legalProfile.qualification.email,
+      pfPhone: legalProfile.qualification.phone,
+      pfOccupation: legalProfile.qualification.occupation,
+      pfIdentityDocument: legalProfile.qualification.identityDocument,
+    };
+  }
+
+  return {
+    tenantId: tenant.id,
+    name: tenant.name,
+    slug: tenant.slug,
+    personType: "PJ",
+    pjCorporateName: legalProfile.qualification.corporateName,
+    pjTradeName: legalProfile.qualification.tradeName,
+    pjCnpj: legalProfile.qualification.document.number,
+    pjEmail: legalProfile.qualification.email,
+    pjPhone: legalProfile.qualification.phone,
+    pjMainActivity: legalProfile.qualification.mainActivity,
+    repFullName: legalProfile.legalRepresentative.fullName,
+    repCpf: legalProfile.legalRepresentative.document.number,
+    repBirthDate: legalProfile.legalRepresentative.birthDate,
+    repEmail: legalProfile.legalRepresentative.email,
+    repPhone: legalProfile.legalRepresentative.phone,
+    repOccupation: legalProfile.legalRepresentative.occupation,
+    repIdentityDocument: legalProfile.legalRepresentative.identityDocument,
+  };
+}
 
 async function getTenantItems(
   context: AuthContext,
@@ -176,39 +233,9 @@ export default async function TenantsPage({ searchParams }: TenantsPageProps) {
             {canCreateTenant ? (
               <Card>
                 <CardHeader title="Novo Cliente" description="Adicione um novo cliente à plataforma" />
-                <form action={createTenantAction}>
-                  <CardBody className="space-y-4">
-                    <input type="hidden" name="returnTo" value={returnTo} />
-
-                    <FormField label="Nome do Cliente" required>
-                      <input
-                        type="text"
-                        name="name"
-                        placeholder="Ex: Acme Corporation"
-                        className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                        required
-                      />
-                    </FormField>
-
-                    <FormField
-                      label="Slug (Identificador)"
-                      hint="URL-friendly identifier. Ex: acme-corp"
-                    >
-                      <input
-                        type="text"
-                        name="slug"
-                        placeholder="Ex: acme-corp"
-                        className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                      />
-                    </FormField>
-                  </CardBody>
-
-                  <CardFooter>
-                    <Button type="submit" variant="primary">
-                      Cadastrar Cliente
-                    </Button>
-                  </CardFooter>
-                </form>
+                <CardBody className="space-y-4">
+                  <TenantCreateForm action={createTenantAction} returnTo={returnTo} />
+                </CardBody>
               </Card>
             ) : null}
 
@@ -234,6 +261,8 @@ export default async function TenantsPage({ searchParams }: TenantsPageProps) {
                       <tr className="border-b border-border bg-surface-muted">
                         <DataTableHead>Nome</DataTableHead>
                         <DataTableHead>Slug</DataTableHead>
+                        <DataTableHead align="center">Tipo</DataTableHead>
+                        <DataTableHead>Documento</DataTableHead>
                         <DataTableHead align="center">Status</DataTableHead>
                         <DataTableHead align="center">Onboarding</DataTableHead>
                         <DataTableHead align="center">Admins</DataTableHead>
@@ -255,6 +284,14 @@ export default async function TenantsPage({ searchParams }: TenantsPageProps) {
                             </code>
                           </DataTableCell>
                           <DataTableCell align="center">
+                            <Badge variant={tenant.personType === "PJ" ? "info" : tenant.personType === "PF" ? "success" : "warning"}>
+                              {tenant.personType}
+                            </Badge>
+                          </DataTableCell>
+                          <DataTableCell>
+                            <span className="text-xs text-muted">{tenant.registrationId ?? "-"}</span>
+                          </DataTableCell>
+                          <DataTableCell align="center">
                             <Badge variant={statusVariant(tenant.status)}>{tenant.status}</Badge>
                           </DataTableCell>
                           <DataTableCell align="center">
@@ -270,6 +307,21 @@ export default async function TenantsPage({ searchParams }: TenantsPageProps) {
                           </DataTableCell>
                           <DataTableCell align="right">
                             <div className="flex items-center justify-end gap-2">
+                              <details className="relative">
+                                <summary className="cursor-pointer rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-surface-muted">
+                                  Editar
+                                </summary>
+                                <div className="absolute right-0 z-10 mt-2 w-[26rem] max-w-[80vw] rounded-xl border border-border bg-background p-4 shadow-lg">
+                                  <p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+                                    Editar cliente
+                                  </p>
+                                  <TenantEditForm
+                                    action={updateTenantAction}
+                                    returnTo={returnTo}
+                                    initialValues={mapTenantToInitialValues(tenant)}
+                                  />
+                                </div>
+                              </details>
                               {canDeleteTenant ? (
                                 <form action={updateTenantAction}>
                                   <input type="hidden" name="returnTo" value={returnTo} />

@@ -67,6 +67,13 @@ export async function sendTenantApprovalEmail(to: string, tenantName: string) {
   await sendMailWithFallback({ to, subject, text }, { tenantName, flow: "tenant-approval" });
 }
 
+export async function sendTenantRequestReceivedEmail(to: string) {
+  const subject = "Solicitacao de tenant recebida";
+  const text = "Recebemos sua solicitacao de cadastro de tenant e ela sera analisada pela equipe responsavel. Voce recebera um novo e-mail com o resultado da aprovacao.";
+
+  await sendMailWithFallback({ to, subject, text }, { flow: "tenant-request-received" });
+}
+
 export async function sendTenantRejectionEmail(to: string, notes?: string | null) {
   const subject = "Cadastro de tenant nao aprovado";
   const text = notes

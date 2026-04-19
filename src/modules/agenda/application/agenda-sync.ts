@@ -2,6 +2,23 @@ import crypto from "node:crypto";
 
 import { prisma } from "@/infra/db/prisma";
 
+const CALENDAR_SYNC_SCOPE = "agenda:calendar-sync-token";
+
+function hashCalendarSyncToken(token: string) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function parseCalendarSyncPayload(value: unknown): { token?: string } {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  const payload = value as { token?: unknown };
+  return {
+    token: typeof payload.token === "string" ? payload.token : undefined,
+  };
+}
+
 function escapeIcsText(value: string) {
   return value.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
 }
@@ -14,36 +31,123 @@ export async function ensureCalendarSyncToken(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
+      id: true,
       calendarSyncToken: true,
+      memberships: {
+        orderBy: {
+          createdAt: "asc",
+        },
+        select: {
+          tenantId: true,
+        },
+        take: 1,
+      },
     },
   });
 
-  if (user?.calendarSyncToken) {
-    return user.calendarSyncToken;
+  if (!user) {
+    return null;
+  }
+
+  const tenantId = user.memberships[0]?.tenantId;
+
+  if (!tenantId) {
+    return null;
+  }
+
+  const storedEntry = await prisma.keyValueEntry.findUnique({
+    where: {
+      tenantId_scope_key: {
+        tenantId,
+        scope: CALENDAR_SYNC_SCOPE,
+        key: user.id,
+      },
+    },
+    select: {
+      value: true,
+    },
+  });
+
+  const storedRawToken = parseCalendarSyncPayload(storedEntry?.value).token;
+
+  if (storedRawToken && user.calendarSyncToken === hashCalendarSyncToken(storedRawToken)) {
+    return storedRawToken;
+  }
+
+  if (user.calendarSyncToken && !storedRawToken) {
+    const legacyRawToken = user.calendarSyncToken;
+
+    await prisma.$transaction([
+      prisma.keyValueEntry.upsert({
+        where: {
+          tenantId_scope_key: {
+            tenantId,
+            scope: CALENDAR_SYNC_SCOPE,
+            key: user.id,
+          },
+        },
+        update: {
+          value: { token: legacyRawToken },
+        },
+        create: {
+          tenantId,
+          scope: CALENDAR_SYNC_SCOPE,
+          key: user.id,
+          value: { token: legacyRawToken },
+        },
+      }),
+      prisma.user.update({
+        where: { id: user.id },
+        data: {
+          calendarSyncToken: hashCalendarSyncToken(legacyRawToken),
+        },
+      }),
+    ]);
+
+    return legacyRawToken;
   }
 
   const calendarSyncToken = crypto.randomBytes(24).toString("hex");
-  const updated = await prisma.user.update({
-    where: { id: userId },
-    data: { calendarSyncToken },
-    select: { calendarSyncToken: true },
-  });
 
-  return updated.calendarSyncToken ?? calendarSyncToken;
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: { calendarSyncToken: hashCalendarSyncToken(calendarSyncToken) },
+    }),
+    prisma.keyValueEntry.upsert({
+      where: {
+        tenantId_scope_key: {
+          tenantId,
+          scope: CALENDAR_SYNC_SCOPE,
+          key: user.id,
+        },
+      },
+      update: {
+        value: { token: calendarSyncToken },
+      },
+      create: {
+        tenantId,
+        scope: CALENDAR_SYNC_SCOPE,
+        key: user.id,
+        value: { token: calendarSyncToken },
+      },
+    }),
+  ]);
+
+  return calendarSyncToken;
 }
 
 export async function getCalendarSyncToken(userId: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { calendarSyncToken: true },
-  });
-
-  return user?.calendarSyncToken ?? null;
+  return ensureCalendarSyncToken(userId);
 }
 
 export async function buildAgendaIcsFeed(token: string) {
-  const user = await prisma.user.findUnique({
-    where: { calendarSyncToken: token },
+  const hashedToken = hashCalendarSyncToken(token);
+
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [{ calendarSyncToken: hashedToken }, { calendarSyncToken: token }],
+    },
     select: {
       id: true,
       email: true,

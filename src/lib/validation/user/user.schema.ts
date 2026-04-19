@@ -1,11 +1,13 @@
 import { z } from "zod";
 
+import { passwordSchema } from "@/lib/validation/auth/password.schema";
+
 export const createUserSchema = z.object({
   email: z.email(),
   name: z.string().min(2).max(120),
   role: z.enum(["SUPER_ADMIN", "ADMIN", "USER"]),
   tenantId: z.string().min(1).optional(),
-  password: z.string().min(8).optional(),
+  password: passwordSchema.optional(),
   profile: z.record(z.string(), z.unknown()).optional(),
   isProfileComplete: z.boolean().optional(),
 });

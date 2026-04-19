@@ -12,7 +12,7 @@ type ActivitiesPageProps = {
 export default async function AtividadesPage({ searchParams }: ActivitiesPageProps) {
   const params = searchParams ? await searchParams : undefined;
   const context = await requireAuth("task:read");
-  const canReviewRegistrations = context.role === "SUPER_ADMIN" || (context.role === "ADMIN" && context.tenantName === "Sistema");
+  const canReviewRegistrations = context.role === "SUPER_ADMIN";
   const [tasks, registrations] = await Promise.all([
     listAdministrativeTasks({ role: context.role, tenantId: context.tenantId, userId: context.userId }),
     canReviewRegistrations ? listTenantRegistrationRequests(context) : Promise.resolve([]),

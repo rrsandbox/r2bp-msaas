@@ -9,10 +9,12 @@ import {
   sendTenantApprovalEmail,
   sendTenantInviteEmail,
   sendTenantRejectionEmail,
+  sendTenantRequestReceivedEmail,
 } from "@/infra/email/mailer";
 import { AppError } from "@/lib/errors/app-error";
 import { ErrorCodes } from "@/lib/errors/error-codes";
 import { slugify } from "@/lib/utils/slugify";
+import { passwordSchema } from "@/lib/validation/auth/password.schema";
 
 type Scope = {
   role: RoleKey;
@@ -22,7 +24,7 @@ type Scope = {
 
 const tenantRegistrationSchema = z.object({
   email: z.email(),
-  password: z.string().min(8),
+  password: passwordSchema,
   tenantName: z.string().min(2).max(120).optional(),
   tenantSlug: z
     .string()
@@ -41,7 +43,7 @@ const tenantInviteSchema = z.object({
 const acceptInviteSchema = z.object({
   token: z.string().min(12),
   name: z.string().min(2).max(120),
-  password: z.string().min(8),
+  password: passwordSchema,
 });
 
 const userProfileSchema = z.object({
@@ -159,6 +161,8 @@ export async function registerTenantPreSignup(input: unknown) {
       },
     },
   });
+
+  await sendTenantRequestReceivedEmail(payload.email);
 
   return request;
 }

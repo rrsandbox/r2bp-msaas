@@ -1,6 +1,8 @@
 import { headers } from "next/headers";
 
 import { requireAuth } from "@/lib/auth/authorization";
+import { AppError } from "@/lib/errors/app-error";
+import { ErrorCodes } from "@/lib/errors/error-codes";
 import { successResponse, withApiErrorHandling } from "@/lib/http/api-response";
 import { recordAuditEvent } from "@/modules/audit/application/audit-service";
 import { createTenant, listTenants } from "@/modules/tenant/application/tenant-service";
@@ -37,6 +39,10 @@ export async function POST(request: Request) {
     },
     async () => {
       const context = await requireAuth("tenant:update");
+      if (context.role !== "SUPER_ADMIN") {
+        throw new AppError("Apenas o super usuario do sistema pode criar tenants.", ErrorCodes.RBAC_FORBIDDEN, 403);
+      }
+
       const payload = await request.json();
       const tenant = await createTenant(payload);
 

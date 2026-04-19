@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 
 import { prisma } from "@/infra/db/prisma";
+import { requireAuth } from "@/lib/auth/authorization";
 import { successResponse, withApiErrorHandling } from "@/lib/http/api-response";
 
 type SetupTableCheck = {
@@ -27,6 +28,8 @@ export async function GET() {
       requestId,
     },
     async () => {
+      await requireAuth("task:read");
+
       let databaseConnected = false;
       let migrationTablePresent = false;
       let checks: SetupTableCheck[] = [];

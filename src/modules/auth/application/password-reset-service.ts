@@ -6,6 +6,7 @@ import { prisma } from "@/infra/db/prisma";
 import { sendPasswordResetEmail } from "@/infra/email/mailer";
 import { AppError } from "@/lib/errors/app-error";
 import { ErrorCodes } from "@/lib/errors/error-codes";
+import { passwordSchema } from "@/lib/validation/auth/password.schema";
 
 const requestSchema = z.object({
   email: z.email(),
@@ -13,8 +14,12 @@ const requestSchema = z.object({
 
 const resetSchema = z.object({
   token: z.string().min(12),
-  password: z.string().min(8),
+  password: passwordSchema,
 });
+
+function hashToken(token: string) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
 
 export async function requestPasswordReset(input: unknown) {
   const payload = requestSchema.parse(input);
@@ -30,7 +35,24 @@ export async function requestPasswordReset(input: unknown) {
     return { accepted: true };
   }
 
+  const existingToken = await prisma.verificationToken.findFirst({
+    where: {
+      identifier: payload.email,
+      expires: {
+        gt: new Date(),
+      },
+    },
+    select: {
+      token: true,
+    },
+  });
+
+  if (existingToken) {
+    return { accepted: true };
+  }
+
   const token = crypto.randomBytes(24).toString("hex");
+  const tokenHash = hashToken(token);
   const expires = new Date(Date.now() + 1000 * 60 * 60);
 
   await prisma.verificationToken.deleteMany({
@@ -40,7 +62,7 @@ export async function requestPasswordReset(input: unknown) {
   await prisma.verificationToken.create({
     data: {
       identifier: payload.email,
-      token,
+      token: tokenHash,
       expires,
     },
   });
@@ -52,11 +74,23 @@ export async function requestPasswordReset(input: unknown) {
 
 export async function resetPassword(input: unknown) {
   const payload = resetSchema.parse(input);
+  const tokenHash = hashToken(payload.token);
   const token = await prisma.verificationToken.findUnique({
-    where: { token: payload.token },
+    where: { token: tokenHash },
   });
 
   if (!token || token.expires < new Date()) {
+    throw new AppError("Token de redefinicao invalido ou expirado.", ErrorCodes.AUTH_INVALID_CREDENTIALS, 400);
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { email: token.identifier },
+    select: {
+      status: true,
+    },
+  });
+
+  if (!user || user.status === "DELETED" || user.status === "BLOCKED") {
     throw new AppError("Token de redefinicao invalido ou expirado.", ErrorCodes.AUTH_INVALID_CREDENTIALS, 400);
   }
 
@@ -67,7 +101,6 @@ export async function resetPassword(input: unknown) {
       where: { email: token.identifier },
       data: {
         passwordHash,
-        status: "ACTIVE",
       },
     }),
     prisma.verificationToken.delete({

@@ -6,6 +6,8 @@ import { AppError } from "@/lib/errors/app-error";
 import { ErrorCodes } from "@/lib/errors/error-codes";
 
 const TWO_FACTOR_SCOPE = "auth:2fa-ticket";
+const TWO_FACTOR_ATTEMPT_SCOPE = "auth:2fa-attempts";
+const MAX_TWO_FACTOR_ATTEMPTS = 5;
 
 type TwoFactorTicketPayload = {
   userId: string;
@@ -36,6 +38,10 @@ type AuthenticatedUser = {
   isProfileComplete: boolean;
 };
 
+type TwoFactorAttemptPayload = {
+  attempts: number;
+};
+
 async function hashCode(code: string) {
   const encoded = new TextEncoder().encode(code);
   const digest = await crypto.subtle.digest("SHA-256", encoded);
@@ -50,6 +56,93 @@ function normalizeCode(code: string) {
 
 function generateCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function parseAttemptPayload(value: unknown): TwoFactorAttemptPayload {
+  if (!value || typeof value !== "object") {
+    return { attempts: 0 };
+  }
+
+  const payload = value as Partial<TwoFactorAttemptPayload>;
+  return {
+    attempts: typeof payload.attempts === "number" ? payload.attempts : 0,
+  };
+}
+
+async function registerTwoFactorFailure(tenantId: string, ticket: string, expiresAt: Date | null) {
+  const current = await prisma.keyValueEntry.findUnique({
+    where: {
+      tenantId_scope_key: {
+        tenantId,
+        scope: TWO_FACTOR_ATTEMPT_SCOPE,
+        key: ticket,
+      },
+    },
+    select: {
+      value: true,
+    },
+  });
+
+  const attempts = parseAttemptPayload(current?.value).attempts + 1;
+
+  await prisma.keyValueEntry.upsert({
+    where: {
+      tenantId_scope_key: {
+        tenantId,
+        scope: TWO_FACTOR_ATTEMPT_SCOPE,
+        key: ticket,
+      },
+    },
+    update: {
+      value: { attempts },
+      expiresAt: expiresAt ?? undefined,
+    },
+    create: {
+      tenantId,
+      scope: TWO_FACTOR_ATTEMPT_SCOPE,
+      key: ticket,
+      value: { attempts },
+      expiresAt: expiresAt ?? undefined,
+    },
+  });
+
+  return attempts;
+}
+
+async function clearTwoFactorFailures(tenantId: string, ticket: string) {
+  await prisma.keyValueEntry.deleteMany({
+    where: {
+      tenantId,
+      scope: TWO_FACTOR_ATTEMPT_SCOPE,
+      key: ticket,
+    },
+  });
+}
+
+async function invalidateTwoFactorChallenge(tenantId: string, userId: string, ticket: string) {
+  await prisma.$transaction([
+    prisma.keyValueEntry.deleteMany({
+      where: {
+        tenantId,
+        scope: TWO_FACTOR_SCOPE,
+        key: ticket,
+      },
+    }),
+    prisma.keyValueEntry.deleteMany({
+      where: {
+        tenantId,
+        scope: TWO_FACTOR_ATTEMPT_SCOPE,
+        key: ticket,
+      },
+    }),
+    prisma.twoFactorCode.deleteMany({
+      where: {
+        tenantId,
+        userId,
+        consumedAt: null,
+      },
+    }),
+  ]);
 }
 
 function parseTicketPayload(value: unknown): TwoFactorTicketPayload {
@@ -181,14 +274,28 @@ export async function verifyTwoFactorCode(ticket: string, code: string) {
   const normalizedCode = normalizeCode(code);
 
   if (normalizedCode.length !== 6) {
+    const attempts = await registerTwoFactorFailure(payload.tenantId, ticket, ticketRecord.expiresAt);
+    if (attempts >= MAX_TWO_FACTOR_ATTEMPTS) {
+      await invalidateTwoFactorChallenge(payload.tenantId, payload.userId, ticket);
+      throw new AppError("Muitas tentativas no 2FA. Faca login novamente.", ErrorCodes.AUTH_BLOCKED, 429);
+    }
+
     throw new AppError("Codigo 2FA invalido.", ErrorCodes.AUTH_2FA_CODE_INVALID, 401);
   }
 
   const providedCodeHash = await hashCode(normalizedCode);
 
   if (!activeCode || activeCode.codeHash !== providedCodeHash) {
+    const attempts = await registerTwoFactorFailure(payload.tenantId, ticket, ticketRecord.expiresAt);
+    if (attempts >= MAX_TWO_FACTOR_ATTEMPTS) {
+      await invalidateTwoFactorChallenge(payload.tenantId, payload.userId, ticket);
+      throw new AppError("Muitas tentativas no 2FA. Faca login novamente.", ErrorCodes.AUTH_BLOCKED, 429);
+    }
+
     throw new AppError("Codigo 2FA invalido.", ErrorCodes.AUTH_2FA_CODE_INVALID, 401);
   }
+
+  await clearTwoFactorFailures(payload.tenantId, ticket);
 
   await prisma.twoFactorCode.update({
     where: {
@@ -239,6 +346,10 @@ export async function consumeTwoFactorTicket(ticket: string): Promise<Authentica
     throw new AppError("Codigo 2FA nao verificado.", ErrorCodes.AUTH_2FA_REQUIRED, 401);
   }
 
+  if (payload.userStatus !== "ACTIVE" || payload.tenantStatus !== "active") {
+    throw new AppError("Sessao 2FA invalida para o estado atual da conta.", ErrorCodes.AUTH_BLOCKED, 403);
+  }
+
   await prisma.keyValueEntry.delete({
     where: {
       tenantId_scope_key: {
@@ -248,6 +359,8 @@ export async function consumeTwoFactorTicket(ticket: string): Promise<Authentica
       },
     },
   });
+
+  await clearTwoFactorFailures(ticketRecord.tenantId, ticket);
 
   return {
     id: payload.userId,

@@ -55,6 +55,7 @@ http://127.0.0.1:54324/view/LYq3e6Hm7oSeMhZme9oXrb
 - API de Sistema (status e setup): [docs/system-api.md](docs/system-api.md)
 - Ledger oficial de versao e compatibilidade do baseline: [VERSION-CONTROL.md](VERSION-CONTROL.md)
 - Manual de preenchimento do ledger: [VERSION-CONTROL-MANUAL.md](VERSION-CONTROL-MANUAL.md)
+- Guia para criar projetos derivados do baseline: [VERSION-CONTROL-CREATE.md](VERSION-CONTROL-CREATE.md)
 
 ## Controle de versao do baseline
 

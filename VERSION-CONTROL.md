@@ -133,3 +133,4 @@ Each derived project should add one record here when created.
 - `docs/` for endpoint and operational runbooks.
 - `VERSION-CONTROL.md` (this file) as the compatibility ledger.
 - `VERSION-CONTROL-MANUAL.md` for operational instructions on how to fill and maintain this ledger.
+- `VERSION-CONTROL-CREATE.md` for step-by-step guide on starting a new derived project from this baseline.

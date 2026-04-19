@@ -120,6 +120,7 @@ model Tenant {
   userInvites     TenantUserInvite[]
   tasks           AdministrativeTask[]
   supportTickets  SupportTicket[]
+  publicComments PublicTenantComment[]
   notices         SystemNotice[]
   approvedBy      User?                 @relation("TenantApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
 }
@@ -158,6 +159,22 @@ model User {
   reviewedTenantRequests TenantRegistrationRequest[] @relation("TenantRequestReviewedBy")
   supportTickets    SupportTicket[]    @relation("SupportTicketRequester")
   ownedTickets      SupportTicket[]    @relation("SupportTicketAssignee")
+  publicComments    PublicTenantComment[]
+}
+
+model PublicTenantComment {
+  id         String   @id @default(uuid())
+  tenantId   String
+  userId     String
+  comment    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([tenantId, createdAt])
+  @@index([userId, createdAt])
 }
 
 model TenantRegistrationRequest {

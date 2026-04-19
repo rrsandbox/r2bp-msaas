@@ -1,9 +1,10 @@
 @host = http://localhost:3000
-@cookie = next-auth.session-token={{SESSION_TOKEN}}
+@cookie = authjs.session-token={{SESSION_TOKEN}}
 @userId = user-id
 @featureId = feature-id
 @permissionId = permission-id
 @eventId = event-id
+@commentId = comment-id
 
 # Dica de setup local:
 # 1) Rode npx supabase start
@@ -96,6 +97,38 @@ Cookie: {{cookie}}
 ### [9] Agenda - remover evento
 DELETE {{host}}/api/agenda/{{eventId}}
 Cookie: {{cookie}}
+
+### [10] Comentarios landing - listar (tenant autenticado)
+GET {{host}}/api/tenants/comments?limit=5
+Cookie: {{cookie}}
+
+### [11] Comentarios landing - criar
+POST {{host}}/api/tenants/comments
+Content-Type: application/json
+Cookie: {{cookie}}
+
+{
+  "comment": "Comentario publicado via api.http para validar fluxo completo"
+}
+
+### [12] Comentarios landing - atualizar
+PUT {{host}}/api/tenants/comments
+Content-Type: application/json
+Cookie: {{cookie}}
+
+{
+  "commentId": "{{commentId}}",
+  "comment": "Comentario atualizado via api.http"
+}
+
+### [13] Comentarios landing - excluir
+DELETE {{host}}/api/tenants/comments
+Content-Type: application/json
+Cookie: {{cookie}}
+
+{
+  "commentId": "{{commentId}}"
+}
 
 # Uso:
 # 1) Preencha SESSION_TOKEN

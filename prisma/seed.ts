@@ -114,6 +114,38 @@ async function main() {
 
   console.log("[seed] user:", commonUser.email, "(role: USER, 2FA: disabled)");
 
+  const seededPublicComments = [
+    {
+      tenantId: tenant.id,
+      userId: masterUser.id,
+      comment: "Com onboarding guiado e validacoes server-side, o tempo de ativacao do tenant caiu bastante.",
+    },
+    {
+      tenantId: tenant.id,
+      userId: adminUser.id,
+      comment: "A separacao por tenant com governanca de acessos simplificou nossa operacao diaria.",
+    },
+  ];
+
+  for (const seededComment of seededPublicComments) {
+    const exists = await prisma.publicTenantComment.findFirst({
+      where: {
+        tenantId: seededComment.tenantId,
+        userId: seededComment.userId,
+        comment: seededComment.comment,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!exists) {
+      await prisma.publicTenantComment.create({
+        data: seededComment,
+      });
+    }
+  }
+
   await prisma.featureFlag.upsert({
     where: {
       tenantId_key: {

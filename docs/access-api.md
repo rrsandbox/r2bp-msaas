@@ -47,7 +47,7 @@ Use uma sessao autenticada (cookie do Auth.js) para testar os endpoints protegid
 
 ```bash
 HOST="http://localhost:3000"
-COOKIE="next-auth.session-token=<SEU_COOKIE_AQUI>"
+COOKIE="authjs.session-token=<SEU_COOKIE_AQUI>"
 ```
 
 No Windows PowerShell, prefira `curl.exe` para evitar conflitos com alias.

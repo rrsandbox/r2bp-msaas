@@ -3,6 +3,10 @@ import { requireAuth } from "@/lib/auth/authorization";
 import type { AuthContext } from "@/lib/auth/authorization";
 import { isInfrastructureUnavailableError } from "@/lib/errors/infrastructure";
 import { listNavigationByArea } from "@/lib/navigation/runtime-navigation";
+import { createPublicCommentAction, deletePublicCommentAction, updatePublicCommentAction } from "@/app/(app)/dashboard/actions";
+import { DashboardCommentForm } from "@/app/(app)/dashboard/comment-form";
+import { DashboardFlashToast } from "@/app/(app)/dashboard/dashboard-flash-toast";
+import { DeleteCommentButton } from "@/app/(app)/dashboard/delete-comment-button";
 
 type DashboardStats = {
   tenantCount: number;
@@ -35,6 +39,12 @@ type DashboardData = {
     status: string;
     priority: string;
   }>;
+  recentTenantComments: Array<{
+    id: string;
+    comment: string;
+    createdAt: Date;
+    authorName: string;
+  }>;
   warning?: string;
 };
 
@@ -56,7 +66,7 @@ async function getDashboardData(context: AuthContext): Promise<DashboardData> {
     const nextDayStart = new Date(dayStart);
     nextDayStart.setDate(nextDayStart.getDate() + 1);
 
-    const [tenantCount, userCount, queuedJobsCount, todayEventsCount, openTasksCount, openTicketsCount, notices, recentTasks, recentTickets] = await Promise.all([
+    const [tenantCount, userCount, queuedJobsCount, todayEventsCount, openTasksCount, openTicketsCount, notices, recentTasks, recentTickets, recentTenantComments] = await Promise.all([
       prisma.tenant.count({ where: tenantWhere }),
       prisma.tenantMembership.count({ where: membershipWhere }),
       prisma.backgroundJob.count({
@@ -143,6 +153,26 @@ async function getDashboardData(context: AuthContext): Promise<DashboardData> {
           priority: true,
         },
       }),
+      prisma.publicTenantComment.findMany({
+        where: {
+          tenantId: context.tenantId,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+        take: 5,
+        select: {
+          id: true,
+          comment: true,
+          createdAt: true,
+          user: {
+            select: {
+              name: true,
+              email: true,
+            },
+          },
+        },
+      }),
     ]);
 
     return {
@@ -163,6 +193,12 @@ async function getDashboardData(context: AuthContext): Promise<DashboardData> {
         tenantName: task.tenant?.name ?? null,
       })),
       recentTickets,
+      recentTenantComments: recentTenantComments.map((item) => ({
+        id: item.id,
+        comment: item.comment,
+        createdAt: item.createdAt,
+        authorName: item.user.name ?? item.user.email,
+      })),
     };
   } catch (error) {
     if (isInfrastructureUnavailableError(error)) {
@@ -178,6 +214,7 @@ async function getDashboardData(context: AuthContext): Promise<DashboardData> {
         notices: [],
         recentTasks: [],
         recentTickets: [],
+        recentTenantComments: [],
         warning: "Banco de dados ainda nao configurado. Defina DATABASE_URL, rode migrations e seed.",
       };
     }
@@ -186,10 +223,31 @@ async function getDashboardData(context: AuthContext): Promise<DashboardData> {
   }
 }
 
-export default async function DashboardPage() {
+type DashboardPageProps = {
+  searchParams?: Promise<{
+    success?: string;
+    error?: string;
+  }>;
+};
+
+export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+  const params = searchParams ? await searchParams : undefined;
+  const successCode = params?.success;
+  const errorMessage = params?.error;
+
+  const successMessage =
+    successCode === "comment-created"
+      ? "Comentario publicado na landing com sucesso."
+      : successCode === "comment-updated"
+        ? "Comentario atualizado na landing com sucesso."
+        : successCode === "comment-deleted"
+          ? "Comentario removido da landing com sucesso."
+      : undefined;
+
   const context = await requireAuth();
-  const { stats, notices, recentTasks, recentTickets, warning } = await getDashboardData(context);
+  const { stats, notices, recentTasks, recentTickets, recentTenantComments, warning } = await getDashboardData(context);
   const availableShortcuts = await listNavigationByArea(context, "dashboard");
+  const canPublishLandingComment = context.role === "SUPER_ADMIN" || context.role === "ADMIN";
 
   const metrics =
     context.role === "SUPER_ADMIN"
@@ -215,7 +273,11 @@ export default async function DashboardPage() {
           ];
 
   return (
-    <main className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+    <>
+      {successMessage ? <DashboardFlashToast kind="success" message={successMessage} /> : null}
+      {errorMessage ? <DashboardFlashToast kind="error" message={errorMessage} /> : null}
+
+      <main className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
       <section className="glass-panel rounded-[4px] p-6">
         <h2 className="text-3xl font-semibold tracking-tight">Dashboard operacional</h2>
         <p className="mt-3 max-w-2xl text-sm leading-7 text-muted">
@@ -266,6 +328,58 @@ export default async function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {canPublishLandingComment ? (
+          <div className="mt-8 rounded-[4px] border border-border/70 bg-surface-elevated p-5">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted">Comentario publico na landing</h3>
+            <p className="mt-2 text-sm text-muted">
+              Publicado apenas por super usuarios e administradores do tenant. Os 20 comentarios mais recentes aparecem no carrossel da pagina inicial.
+            </p>
+
+            <DashboardCommentForm action={createPublicCommentAction} returnTo="/dashboard" />
+
+            <div className="mt-5 grid gap-2">
+              {recentTenantComments.length === 0 ? (
+                <article className="rounded-[4px] border border-border/70 bg-surface p-3 text-sm text-muted">
+                  Ainda nao existem comentarios publicados para este tenant.
+                </article>
+              ) : (
+                recentTenantComments.map((item) => (
+                  <article key={item.id} className="rounded-[4px] border border-border/70 bg-surface p-3 text-sm">
+                    <form action={updatePublicCommentAction} className="grid gap-2">
+                      <input type="hidden" name="returnTo" value="/dashboard" />
+                      <input type="hidden" name="commentId" value={item.id} />
+                      <textarea
+                        name="comment"
+                        defaultValue={item.comment}
+                        minLength={8}
+                        maxLength={400}
+                        required
+                        className="min-h-20 w-full rounded-[4px] border border-border bg-background px-3 py-2 text-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      />
+                      <p className="text-xs text-muted">
+                        {item.authorName} • {item.createdAt.toLocaleString("pt-BR")}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="submit"
+                          className="rounded-[4px] border border-border bg-surface-elevated px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-surface-muted"
+                        >
+                          Salvar
+                        </button>
+                      </div>
+                    </form>
+                    <form action={deletePublicCommentAction} className="mt-2">
+                      <input type="hidden" name="returnTo" value="/dashboard" />
+                      <input type="hidden" name="commentId" value={item.id} />
+                      <DeleteCommentButton />
+                    </form>
+                  </article>
+                ))
+              )}
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <section className="glass-panel rounded-[4px] p-6">
@@ -312,6 +426,7 @@ export default async function DashboardPage() {
           </>
         ) : null}
       </section>
-    </main>
+      </main>
+    </>
   );
 }

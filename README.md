@@ -49,6 +49,7 @@ http://127.0.0.1:54324/view/LYq3e6Hm7oSeMhZme9oXrb
 
 - Referencia da API de Acessos: [docs/access-api.md](docs/access-api.md)
 - Referencia da API de Agenda: [docs/agenda-api.md](docs/agenda-api.md)
+- Referencia da API de Comentarios publicos (landing): [docs/comments-api.md](docs/comments-api.md)
 - Colecao REST Client unificada (smoke test): [docs/api.http](docs/api.http)
 - Guia de troubleshooting de testes de API: [docs/api-testing.md](docs/api-testing.md)
 - API de Sistema (status e setup): [docs/system-api.md](docs/system-api.md)

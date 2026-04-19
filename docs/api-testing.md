@@ -69,7 +69,7 @@ O seed imprime no terminal os IDs de referencia para acelerar o preenchimento de
 4. No arquivo `.http`, defina:
 
 ```http
-@cookie = next-auth.session-token=SEU_TOKEN
+@cookie = authjs.session-token=SEU_TOKEN
 ```
 
 Se estiver usando outro nome de cookie no ambiente, substitua a chave mantendo o mesmo formato `nome=valor`.

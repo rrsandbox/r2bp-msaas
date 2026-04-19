@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { ArrowRight, Building2, CalendarClock, ShieldCheck } from "lucide-react";
 
+import type { LandingPublicComment } from "@/modules/marketing/application/public-comment-service";
 import { Button } from "@/ui/components/button";
 import { SectionHeader } from "@/modules/shared/presentation/section-header";
+import { TestimonialsCarousel } from "@/modules/marketing/presentation/testimonials-carousel";
 
 const pillars = [
   {
@@ -22,30 +24,13 @@ const pillars = [
   },
 ];
 
-const testimonials = [
-  {
-    author: "Mariana Prado",
-    role: "Super usuaria de tenant",
-    quote: "O onboarding guiado reduziu o tempo entre aprovacao e operacao real da tenant.",
-  },
-  {
-    author: "Carlos Nunes",
-    role: "Usuario comum",
-    quote: "O convite por e-mail e a conclusao obrigatoria do perfil evitaram cadastros incompletos no time.",
-  },
-  {
-    author: "Equipe de Operacoes",
-    role: "Super usuario do sistema",
-    quote: "A fila de aprovacao e a task list centralizada deixaram a governanca do SaaS mais previsivel.",
-  },
-];
-
 type LandingPageProps = {
   success?: string;
   error?: string;
+  testimonials: LandingPublicComment[];
 };
 
-export function LandingPage({ success, error }: LandingPageProps) {
+export function LandingPage({ success, error, testimonials }: LandingPageProps) {
   const successMessage =
     success === "tenant-requested"
       ? "Pedido de cadastro enviado com sucesso. Aguarde a aprovacao e acompanhe por e-mail."
@@ -150,15 +135,7 @@ export function LandingPage({ success, error }: LandingPageProps) {
           description="A experiencia dos perfis do sistema precisa refletir aprovacao, onboarding, convites e isolamento real por tenant."
         />
 
-        <div className="grid gap-4 lg:grid-cols-3">
-          {testimonials.map((item) => (
-            <article key={item.author} className="glass-panel rounded-[1.75rem] p-6">
-              <p className="text-base leading-7 text-foreground">“{item.quote}”</p>
-              <p className="mt-6 text-sm font-semibold">{item.author}</p>
-              <p className="text-xs uppercase tracking-[0.18em] text-muted">{item.role}</p>
-            </article>
-          ))}
-        </div>
+        <TestimonialsCarousel items={testimonials} />
       </section>
 
       <section className="app-shell flex flex-wrap items-center justify-between gap-4 py-8 text-sm text-muted">

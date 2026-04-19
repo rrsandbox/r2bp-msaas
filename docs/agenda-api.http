@@ -1,5 +1,5 @@
 @host = http://localhost:3000
-@cookie = next-auth.session-token={{SESSION_TOKEN}}
+@cookie = authjs.session-token={{SESSION_TOKEN}}
 @eventId = event-id
 
 ### Listar agenda com filtros, paginacao e ordenacao

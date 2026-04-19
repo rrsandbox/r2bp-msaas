@@ -7,7 +7,7 @@ import { AppError } from "@/lib/errors/app-error";
 import { ErrorCodes } from "@/lib/errors/error-codes";
 import { prisma } from "@/infra/db/prisma";
 import { isInfrastructureUnavailableError } from "@/lib/errors/infrastructure";
-import { recordAuditEvent } from "@/modules/audit/application/audit-service";
+import { recordAuditEventSafe } from "@/modules/audit/application/audit-service";
 
 export type AuthContext = {
   userId: string;
@@ -89,26 +89,20 @@ export async function requireAuth(requiredPermission?: string): Promise<AuthCont
     const allowed = await canAccessPermission(context, requiredPermission);
 
     if (!allowed) {
-      try {
-        await recordAuditEvent({
-          tenantId: context.tenantId,
-          userId: context.userId,
-          action: "ACCESS_DENIED",
-          resource: requiredPermission,
-          severity: "WARNING",
-          payload: {
-            requiredPermission,
-            role: context.role,
-            tenantStatus: context.tenantStatus,
-            tenantOnboardingStatus: context.tenantOnboardingStatus,
-            userStatus: context.userStatus,
-          },
-        });
-      } catch (auditError) {
-        if (!isInfrastructureUnavailableError(auditError)) {
-          throw auditError;
-        }
-      }
+      await recordAuditEventSafe({
+        tenantId: context.tenantId,
+        userId: context.userId,
+        action: "ACCESS_DENIED",
+        resource: requiredPermission,
+        severity: "WARNING",
+        payload: {
+          requiredPermission,
+          role: context.role,
+          tenantStatus: context.tenantStatus,
+          tenantOnboardingStatus: context.tenantOnboardingStatus,
+          userStatus: context.userStatus,
+        },
+      });
 
       throw new AppError("Permissao insuficiente para esta operacao.", ErrorCodes.RBAC_FORBIDDEN, 403);
     }

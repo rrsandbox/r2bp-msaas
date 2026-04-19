@@ -218,6 +218,14 @@ Cookie: {{cookie}}
 DELETE {{host}}/api/tenants/{{tenantId}}
 Cookie: {{cookie}}
 
+### [18] Auditoria - listar logs do tenant autenticado
+GET {{host}}/api/audit/logs?page=1&pageSize=20
+Cookie: {{cookie}}
+
+### [19] Auditoria - filtrar warnings de acesso negado no periodo
+GET {{host}}/api/audit/logs?page=1&pageSize=20&severity=WARNING&action=ACCESS_DENIED&from=2026-04-01T00:00:00.000Z&to=2026-04-30T23:59:59.000Z
+Cookie: {{cookie}}
+
 # Uso:
 # 1) Preencha SESSION_TOKEN
 # 2) Opcional: ajuste host

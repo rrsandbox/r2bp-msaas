@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { reportError } from "@/lib/errors/report-error";
+import { logger } from "@/infra/observability/logger";
 
 type SuccessEnvelope<T> = {
   ok: true;
@@ -65,9 +66,39 @@ export async function withApiErrorHandling<T>(
   context: ApiContext,
   handler: () => Promise<NextResponse<SuccessEnvelope<T>>>,
 ) {
+  const startedAt = Date.now();
+
   try {
-    return await handler();
+    const response = await handler();
+    const elapsedMs = Date.now() - startedAt;
+
+    logger.info(
+      {
+        operation: context.operation,
+        requestId: context.requestId,
+        tenantId: context.tenantId,
+        userId: context.userId,
+        statusCode: response.status,
+        elapsedMs,
+      },
+      "API request concluida com sucesso.",
+    );
+
+    return response;
   } catch (error) {
+    const elapsedMs = Date.now() - startedAt;
+
+    logger.warn(
+      {
+        operation: context.operation,
+        requestId: context.requestId,
+        tenantId: context.tenantId,
+        userId: context.userId,
+        elapsedMs,
+      },
+      "API request concluida com erro.",
+    );
+
     return errorResponse(error, context);
   }
 }

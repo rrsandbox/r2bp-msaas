@@ -1,0 +1,131 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f3f2ee;
+  --foreground: #152538;
+  --surface: #fbfaf7;
+  --surface-muted: #eef1f5;
+  --surface-elevated: rgba(255, 255, 255, 0.72);
+  --surface-contrast: #f1ebe2;
+  --border: rgba(21, 37, 56, 0.12);
+  --primary: #0f6cbd;
+  --primary-foreground: #ffffff;
+  --muted: #627286;
+  --success: #177245;
+  --danger: #a4262c;
+  --ring: rgba(15, 108, 189, 0.3);
+  --accent-warm: #cf9358;
+  --highlight-soft: #f7efe2;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-contrast: var(--surface-contrast);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-ring: var(--ring);
+  --color-accent-warm: var(--accent-warm);
+  --color-highlight-soft: var(--highlight-soft);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+.dark {
+  --background: #081120;
+  --foreground: #f5f7fb;
+  --surface: #0f1b31;
+  --surface-muted: #13243f;
+  --surface-elevated: rgba(18, 34, 59, 0.78);
+  --surface-contrast: #182b47;
+  --border: rgba(245, 247, 251, 0.14);
+  --primary: #77b7f7;
+  --primary-foreground: #081120;
+  --muted: #a6b4c6;
+  --success: #8ee3b6;
+  --danger: #ff8f94;
+  --ring: rgba(119, 183, 247, 0.36);
+  --accent-warm: #f0b578;
+  --highlight-soft: #2a3346;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(15, 108, 189, 0.12), transparent 30%),
+    radial-gradient(circle at 86% 12%, color-mix(in srgb, var(--accent-warm) 20%, transparent), transparent 22%),
+    linear-gradient(180deg, var(--background) 0%, color-mix(in srgb, var(--background) 96%, #ffffff 4%) 100%);
+  color: var(--foreground);
+  font-family: var(--font-sans), sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+.app-shell {
+  width: min(1200px, calc(100vw - 2rem));
+  margin: 0 auto;
+}
+
+.glass-panel {
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 20px 56px rgba(8, 17, 32, 0.06);
+}
+
+.rounded-lg,
+.rounded-xl,
+.rounded-2xl,
+.rounded-3xl,
+.rounded-full,
+.rounded-\[2rem\],
+.rounded-\[1\.125rem\],
+.rounded-\[1rem\],
+.rounded-\[0\.875rem\],
+.rounded-\[0\.75rem\],
+.rounded-\[0\.625rem\],
+.rounded-\[4px\] {
+  border-radius: 4px;
+}
+
+.status-dot {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 999px;
+  display: inline-flex;
+  background: var(--success);
+}

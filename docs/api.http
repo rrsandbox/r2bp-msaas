@@ -1,0 +1,104 @@
+@host = http://localhost:3000
+@cookie = next-auth.session-token={{SESSION_TOKEN}}
+@userId = user-id
+@featureId = feature-id
+@permissionId = permission-id
+@eventId = event-id
+
+# Dica de setup local:
+# 1) Rode npx supabase start
+# 2) Rode npm run db:prepare-local
+# 3) Login com admin@sistema.local / ChangeMe123!
+# 4) Use os IDs impressos pelo seed para userId, featureId e eventId
+
+### [0] Health check local
+GET {{host}}/api/system/status
+
+### [0.1] Setup check (DB + tabelas criticas)
+GET {{host}}/api/system/setup
+
+### [1] Access - listar features
+GET {{host}}/api/access/features
+Cookie: {{cookie}}
+
+### [1.1] Users - listar usuarios (para obter userId)
+GET {{host}}/api/users
+Cookie: {{cookie}}
+
+### [2] Access - criar feature
+POST {{host}}/api/access/features
+Content-Type: application/json
+Cookie: {{cookie}}
+
+{
+  "key": "agenda:read",
+  "name": "Agenda leitura",
+  "description": "Permite consultar agenda",
+  "route": "/agenda",
+  "showInMenu": true,
+  "showInDashboard": true,
+  "sortOrder": 10,
+  "enabled": true
+}
+
+### [3] Access - listar permissoes customizadas
+GET {{host}}/api/access/permissions
+Cookie: {{cookie}}
+
+### [4] Access - criar/atualizar permissao por usuario
+PUT {{host}}/api/access/permissions
+Content-Type: application/json
+Cookie: {{cookie}}
+
+{
+  "userId": "{{userId}}",
+  "featureId": "{{featureId}}",
+  "canAccess": true
+}
+
+### [5] Access - remover permissao customizada
+DELETE {{host}}/api/access/permissions
+Content-Type: application/json
+Cookie: {{cookie}}
+
+{
+  "permissionId": "{{permissionId}}"
+}
+
+### [6] Agenda - listar com filtros, paginacao e ordenacao
+GET {{host}}/api/agenda?startsFrom=2026-04-01&startsTo=2026-04-30&ownerQuery=admin&page=1&pageSize=10&startsAtSort=asc
+Cookie: {{cookie}}
+
+### [7] Agenda - criar evento
+POST {{host}}/api/agenda
+Content-Type: application/json
+Cookie: {{cookie}}
+
+{
+  "title": "Reuniao de operacao",
+  "description": "Revisao semanal",
+  "startsAt": "2026-04-18T10:00:00.000Z",
+  "endsAt": "2026-04-18T11:00:00.000Z"
+}
+
+### [8] Agenda - atualizar evento
+PATCH {{host}}/api/agenda/{{eventId}}
+Content-Type: application/json
+Cookie: {{cookie}}
+
+{
+  "title": "Reuniao atualizada",
+  "description": "Revisao semanal atualizada",
+  "startsAt": "2026-04-18T10:30:00.000Z",
+  "endsAt": "2026-04-18T11:30:00.000Z"
+}
+
+### [9] Agenda - remover evento
+DELETE {{host}}/api/agenda/{{eventId}}
+Cookie: {{cookie}}
+
+# Uso:
+# 1) Preencha SESSION_TOKEN
+# 2) Opcional: ajuste host
+# 3) Atualize userId/featureId/permissionId/eventId conforme seu ambiente
+# 4) Execute em ordem para smoke test manual

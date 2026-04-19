@@ -1,0 +1,508 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum RoleKey {
+  SUPER_ADMIN
+  ADMIN
+  USER
+}
+
+enum UserStatus {
+  PENDING_APPROVAL
+  INVITED
+  ACTIVE
+  INACTIVE
+  BLOCKED
+  DELETED
+}
+
+enum TenantRegistrationStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+enum OnboardingStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  DISMISSED
+}
+
+enum TaskType {
+  APPROVE_TENANT_REGISTRATION
+  REVIEW_TENANT_ONBOARDING
+  REVIEW_TENANT_USERS
+  REVIEW_SUPPORT_TICKET
+  SYSTEM_ADMIN
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum RecurrenceFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum QueueJobStatus {
+  PENDING
+  PROCESSING
+  DONE
+  FAILED
+}
+
+enum AuditSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+model Tenant {
+  id              String                @id @default(uuid())
+  slug            String                @unique
+  name            String
+  status          String                @default("active")
+  onboardingStatus OnboardingStatus     @default(PENDING)
+  legalProfile    Json?
+  billingProfile  Json?
+  adminProfile    Json?
+  approvedAt      DateTime?
+  approvedById    String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  settings        TenantSetting?
+  memberships     TenantMembership[]
+  featureFlags    FeatureFlag[]
+  auditLogs       AuditLog[]
+  agendas         AgendaEvent[]
+  trustedBrowsers TrustedBrowser[]
+  twoFactorCodes  TwoFactorCode[]
+  keyValues       KeyValueEntry[]
+  locks           DistributedLock[]
+  jobs            BackgroundJob[]
+  webhookConfigs  WebhookConfig[]
+  accessFeatures  AccessFeature[]
+  userPermissions UserFeaturePermission[]
+  registrationRequests TenantRegistrationRequest[]
+  userInvites     TenantUserInvite[]
+  tasks           AdministrativeTask[]
+  supportTickets  SupportTicket[]
+  notices         SystemNotice[]
+  approvedBy      User?                 @relation("TenantApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+}
+
+model User {
+  id                String             @id @default(uuid())
+  name              String?
+  email             String             @unique
+  passwordHash      String?
+  emailVerified     DateTime?
+  status            UserStatus         @default(PENDING_APPROVAL)
+  profile           Json?
+  isProfileComplete Boolean            @default(false)
+  profileCompletedAt DateTime?
+  anonymizedAt      DateTime?
+  deactivatedAt     DateTime?
+  calendarSyncToken String?            @unique
+  twoFactorEnabled  Boolean            @default(false)
+  trustedQuestion   String?
+  trustedAnswerHash String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  accounts          Account[]
+  sessions          Session[]
+  memberships       TenantMembership[]
+  auditLogs         AuditLog[]
+  agendas           AgendaEvent[]      @relation("OwnerAgenda")
+  twoFactorCodes    TwoFactorCode[]
+  trustedBrowsers   TrustedBrowser[]
+  featurePermissions UserFeaturePermission[]
+  approvedTenants   Tenant[]           @relation("TenantApprovedBy")
+  sentInvites       TenantUserInvite[] @relation("InviteSentBy")
+  acceptedInvites   TenantUserInvite[] @relation("InviteAcceptedBy")
+  assignedTasks     AdministrativeTask[] @relation("TaskAssignedTo")
+  createdTasks      AdministrativeTask[] @relation("TaskCreatedBy")
+  reviewedTenantRequests TenantRegistrationRequest[] @relation("TenantRequestReviewedBy")
+  supportTickets    SupportTicket[]    @relation("SupportTicketRequester")
+  ownedTickets      SupportTicket[]    @relation("SupportTicketAssignee")
+}
+
+model TenantRegistrationRequest {
+  id                 String                   @id @default(uuid())
+  email              String
+  passwordHash       String
+  requestedTenantName String?
+  requestedTenantSlug String?
+  status             TenantRegistrationStatus @default(PENDING_APPROVAL)
+  reviewNotes        String?
+  reviewerId         String?
+  tenantId           String?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  reviewedAt         DateTime?
+  approvedAt         DateTime?
+  rejectedAt         DateTime?
+  tenant             Tenant?                  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  reviewer           User?                    @relation("TenantRequestReviewedBy", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([email, status])
+}
+
+model TenantUserInvite {
+  id             String       @id @default(uuid())
+  tenantId       String
+  email          String
+  role           RoleKey
+  status         InviteStatus @default(PENDING)
+  tokenHash      String       @unique
+  invitedById    String
+  acceptedUserId String?
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invitedBy      User         @relation("InviteSentBy", fields: [invitedById], references: [id], onDelete: Cascade)
+  acceptedUser   User?        @relation("InviteAcceptedBy", fields: [acceptedUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([email, status])
+}
+
+model AdministrativeTask {
+  id           String     @id @default(uuid())
+  tenantId     String?
+  type         TaskType
+  status       TaskStatus @default(OPEN)
+  title        String
+  description  String?
+  payload      Json?
+  assignedToId String?
+  createdById  String?
+  dueAt        DateTime?
+  resolvedAt   DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  tenant       Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignedTo   User?      @relation("TaskAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdBy    User?      @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status, type])
+  @@index([assignedToId, status])
+}
+
+model SystemNotice {
+  id         String    @id @default(uuid())
+  tenantId   String?
+  title      String
+  message    String
+  isActive   Boolean   @default(true)
+  startsAt   DateTime?
+  endsAt     DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  tenant     Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, isActive])
+}
+
+model SupportTicket {
+  id            String         @id @default(uuid())
+  tenantId      String
+  requesterId   String
+  assigneeId    String?
+  subject       String
+  description   String
+  status        TicketStatus   @default(OPEN)
+  priority      TicketPriority @default(MEDIUM)
+  resolution    String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  resolvedAt    DateTime?
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requester     User           @relation("SupportTicketRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  assignee      User?          @relation("SupportTicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status, priority])
+  @@index([requesterId, status])
+}
+
+model AccessFeature {
+  id              String                  @id @default(uuid())
+  tenantId        String
+  key             String
+  name            String
+  description     String?
+  route           String?
+  showInMenu      Boolean                 @default(false)
+  showInDashboard Boolean                 @default(false)
+  sortOrder       Int                     @default(100)
+  enabled         Boolean                 @default(true)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  tenant          Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userPermissions UserFeaturePermission[]
+
+  @@unique([tenantId, key])
+  @@index([tenantId, enabled])
+}
+
+model UserFeaturePermission {
+  id         String       @id @default(uuid())
+  tenantId   String
+  userId     String
+  featureId  String
+  canAccess  Boolean      @default(false)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  tenant     Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  feature    AccessFeature @relation(fields: [featureId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, featureId])
+  @@index([tenantId, userId])
+  @@index([tenantId, featureId])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model LoginAttempt {
+  id          String   @id @default(uuid())
+  email       String
+  ipAddress   String
+  attempts    Int      @default(0)
+  blockedUntil DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([email, ipAddress])
+  @@index([expiresAt])
+}
+
+model TenantMembership {
+  id        String    @id @default(uuid())
+  tenantId  String
+  userId    String
+  role      RoleKey
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@index([tenantId, role])
+}
+
+model TenantSetting {
+  id             String   @id @default(uuid())
+  tenantId       String   @unique
+  locale         String   @default("pt-BR")
+  timezone       String   @default("America/Sao_Paulo")
+  twoFactorTtl   Int      @default(10)
+  trustedTtlDays Int      @default(30)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model TwoFactorCode {
+  id         String   @id @default(uuid())
+  tenantId   String
+  userId     String
+  codeHash   String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime @default(now())
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, userId, expiresAt])
+}
+
+model TrustedBrowser {
+  id          String   @id @default(uuid())
+  tenantId    String
+  userId      String
+  fingerprint String
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, fingerprint])
+}
+
+model AuditLog {
+  id         String        @id @default(uuid())
+  tenantId    String
+  userId      String?
+  action      String
+  resource    String
+  severity    AuditSeverity @default(INFO)
+  payload     Json?
+  createdAt   DateTime      @default(now())
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([userId, createdAt])
+}
+
+model FeatureFlag {
+  id         String   @id @default(uuid())
+  tenantId    String
+  key         String
+  enabled     Boolean  @default(false)
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+}
+
+model AgendaEvent {
+  id                  String               @id @default(uuid())
+  tenantId            String
+  ownerId             String
+  title               String
+  description         String?
+  startsAt            DateTime
+  endsAt              DateTime
+  seriesId            String?
+  recurrenceFrequency RecurrenceFrequency?
+  recurrenceInterval  Int?
+  recurrenceUntil     DateTime?
+  recurrenceCount     Int?
+  isRecurringRoot     Boolean              @default(false)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  owner               User                 @relation("OwnerAgenda", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, ownerId, startsAt])
+  @@index([seriesId])
+}
+
+model KeyValueEntry {
+  id         String   @id @default(uuid())
+  tenantId   String
+  scope      String
+  key        String
+  value      Json
+  expiresAt  DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, scope, key])
+}
+
+model DistributedLock {
+  id         String   @id @default(uuid())
+  tenantId   String
+  key        String
+  owner      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+}
+
+model BackgroundJob {
+  id           String         @id @default(uuid())
+  tenantId      String
+  type          String
+  payload       Json?
+  status        QueueJobStatus @default(PENDING)
+  runAt         DateTime
+  lockedAt      DateTime?
+  attempts      Int            @default(0)
+  lastError     String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status, runAt])
+}
+
+model WebhookConfig {
+  id         String   @id @default(uuid())
+  tenantId   String
+  name       String
+  targetUrl  String
+  secret     String
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}

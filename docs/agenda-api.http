@@ -1,0 +1,35 @@
+@host = http://localhost:3000
+@cookie = next-auth.session-token={{SESSION_TOKEN}}
+@eventId = event-id
+
+### Listar agenda com filtros, paginacao e ordenacao
+GET {{host}}/api/agenda?startsFrom=2026-04-01&startsTo=2026-04-30&ownerQuery=admin&page=1&pageSize=10&startsAtSort=asc
+Cookie: {{cookie}}
+
+### Criar evento na agenda
+POST {{host}}/api/agenda
+Content-Type: application/json
+Cookie: {{cookie}}
+
+{
+  "title": "Reuniao de operacao",
+  "description": "Revisao semanal",
+  "startsAt": "2026-04-18T10:00:00.000Z",
+  "endsAt": "2026-04-18T11:00:00.000Z"
+}
+
+### Atualizar evento da agenda
+PATCH {{host}}/api/agenda/{{eventId}}
+Content-Type: application/json
+Cookie: {{cookie}}
+
+{
+  "title": "Reuniao atualizada",
+  "description": "Revisao semanal atualizada",
+  "startsAt": "2026-04-18T10:30:00.000Z",
+  "endsAt": "2026-04-18T11:30:00.000Z"
+}
+
+### Remover evento da agenda
+DELETE {{host}}/api/agenda/{{eventId}}
+Cookie: {{cookie}}

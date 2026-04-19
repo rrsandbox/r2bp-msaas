@@ -1,0 +1,52 @@
+@host = http://localhost:3000
+@cookie = next-auth.session-token={{SESSION_TOKEN}}
+@userId = user-id
+@featureId = feature-id
+@permissionId = permission-id
+
+### Health check local (opcional)
+GET {{host}}/api/system/status
+
+### Listar features de acesso
+GET {{host}}/api/access/features
+Cookie: {{cookie}}
+
+### Criar feature de acesso
+POST {{host}}/api/access/features
+Content-Type: application/json
+Cookie: {{cookie}}
+
+{
+  "key": "agenda:read",
+  "name": "Agenda leitura",
+  "description": "Permite consultar agenda",
+  "route": "/agenda",
+  "showInMenu": true,
+  "showInDashboard": true,
+  "sortOrder": 10,
+  "enabled": true
+}
+
+### Listar permissoes customizadas
+GET {{host}}/api/access/permissions
+Cookie: {{cookie}}
+
+### Criar/atualizar permissao por usuario
+PUT {{host}}/api/access/permissions
+Content-Type: application/json
+Cookie: {{cookie}}
+
+{
+  "userId": "{{userId}}",
+  "featureId": "{{featureId}}",
+  "canAccess": true
+}
+
+### Remover permissao customizada
+DELETE {{host}}/api/access/permissions
+Content-Type: application/json
+Cookie: {{cookie}}
+
+{
+  "permissionId": "{{permissionId}}"
+}

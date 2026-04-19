@@ -226,6 +226,20 @@ Cookie: {{cookie}}
 GET {{host}}/api/audit/logs?page=1&pageSize=20&severity=WARNING&action=ACCESS_DENIED&from=2026-04-01T00:00:00.000Z&to=2026-04-30T23:59:59.000Z
 Cookie: {{cookie}}
 
+### [20] Auditoria - exportar CSV
+GET {{host}}/api/audit/logs/export?severity=WARNING&action=ACCESS_DENIED&maxRows=2000
+Cookie: {{cookie}}
+
+### [21] Auditoria - executar retencao (dry-run)
+POST {{host}}/api/system/audit/retention
+Content-Type: application/json
+Cookie: {{cookie}}
+
+{
+  "retentionDays": 180,
+  "dryRun": true
+}
+
 # Uso:
 # 1) Preencha SESSION_TOKEN
 # 2) Opcional: ajuste host

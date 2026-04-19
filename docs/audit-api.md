@@ -8,6 +8,8 @@ com filtros, paginacao e resumo agregado por severidade e acao.
 ## Endpoint
 
 - `GET /api/audit/logs`
+- `GET /api/audit/logs/export`
+- `POST /api/system/audit/retention`
 
 Permissao necessaria:
 
@@ -23,6 +25,10 @@ Permissao necessaria:
 - `resource` (opcional): filtro por recurso (contains, case-insensitive).
 - `userId` (opcional): filtra eventos de um usuario especifico.
 - `severity` (opcional): `INFO`, `WARNING` ou `CRITICAL`.
+
+### Parametro extra para exportacao
+
+- `maxRows` (opcional): limite de linhas no CSV. Padrao `1000`, maximo `10000`.
 
 ## Exemplo de resposta
 
@@ -78,6 +84,81 @@ Permissao necessaria:
     }
   }
 }
+```
+
+## Exportacao CSV
+
+Exemplo:
+
+`GET /api/audit/logs/export?severity=WARNING&action=ACCESS_DENIED&maxRows=2000`
+
+Retorna `text/csv` com colunas:
+
+- `id`
+- `tenantId`
+- `userId`
+- `userName`
+- `userEmail`
+- `action`
+- `resource`
+- `severity`
+- `payload`
+- `createdAt`
+
+## Retencao automatizada
+
+Endpoint:
+
+- `POST /api/system/audit/retention`
+
+Permissao e escopo:
+
+- requer autenticacao com `task:read`
+- restrito a `SUPER_ADMIN`
+
+Payload de exemplo:
+
+```json
+{
+  "retentionDays": 180,
+  "dryRun": true,
+  "tenantId": "opcional-uuid-do-tenant"
+}
+```
+
+Resposta de exemplo:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "result": {
+      "retentionDays": 180,
+      "cutoff": "2025-10-21T00:00:00.000Z",
+      "eligibleCount": 2380,
+      "deletedCount": 0,
+      "dryRun": true,
+      "tenantId": null
+    }
+  }
+}
+```
+
+## Script de operacao
+
+Comando local:
+
+- Basico: `npm run audit:retention`
+- Com parametros (Windows PowerShell):
+
+```powershell
+$env:AUDIT_RETENTION_DAYS='180'
+$env:AUDIT_RETENTION_DRY_RUN='true'
+$env:AUDIT_RETENTION_TENANT_ID='<tenantId-opcional>'
+npm run audit:retention
+Remove-Item Env:AUDIT_RETENTION_DAYS -ErrorAction SilentlyContinue
+Remove-Item Env:AUDIT_RETENTION_DRY_RUN -ErrorAction SilentlyContinue
+Remove-Item Env:AUDIT_RETENTION_TENANT_ID -ErrorAction SilentlyContinue
 ```
 
 ## Boas praticas de operacao

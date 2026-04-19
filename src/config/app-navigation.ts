@@ -91,4 +91,13 @@ export const appNavigationCatalog: AppNavigationItem[] = [
     showInDashboard: true,
     icon: "🔐",
   },
+  {
+    href: "/auditoria",
+    label: "Auditoria",
+    description: "Rastreamento de eventos de seguranca, operacao e compliance.",
+    permission: "audit:read",
+    showInMenu: true,
+    showInDashboard: true,
+    icon: "🧾",
+  },
 ];

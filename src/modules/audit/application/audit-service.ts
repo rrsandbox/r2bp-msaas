@@ -25,13 +25,7 @@ type ListAuditEventsInput = {
   to?: Date;
 };
 
-type SummarizeAuditEventsInput = {
-  tenantId: string;
-  from?: Date;
-  to?: Date;
-};
-
-function buildWhereClause(input: {
+type AuditFiltersInput = {
   tenantId: string;
   action?: string;
   resource?: string;
@@ -39,7 +33,25 @@ function buildWhereClause(input: {
   userId?: string;
   from?: Date;
   to?: Date;
-}): Prisma.AuditLogWhereInput {
+};
+
+type ExportAuditEventsCsvInput = AuditFiltersInput & {
+  maxRows: number;
+};
+
+type RunAuditRetentionInput = {
+  retentionDays: number;
+  dryRun?: boolean;
+  tenantId?: string;
+};
+
+type SummarizeAuditEventsInput = {
+  tenantId: string;
+  from?: Date;
+  to?: Date;
+};
+
+function buildWhereClause(input: AuditFiltersInput): Prisma.AuditLogWhereInput {
   const createdAt: Prisma.DateTimeFilter = {};
 
   if (input.from) createdAt.gte = input.from;
@@ -53,6 +65,21 @@ function buildWhereClause(input: {
     userId: input.userId,
     createdAt: Object.keys(createdAt).length > 0 ? createdAt : undefined,
   };
+}
+
+function formatCsvCell(value: unknown) {
+  if (value === null || value === undefined) return "";
+
+  const text = typeof value === "string" ? value : JSON.stringify(value);
+  const escaped = text.replace(/"/g, '""');
+
+  return `"${escaped}"`;
+}
+
+function toCsv(rows: Array<Record<string, unknown>>, headers: string[]) {
+  const headerLine = headers.join(",");
+  const dataLines = rows.map((row) => headers.map((header) => formatCsvCell(row[header])).join(","));
+  return [headerLine, ...dataLines].join("\n");
 }
 
 export async function recordAuditEvent(input: RecordAuditEventInput) {
@@ -180,5 +207,101 @@ export async function summarizeAuditEvents(input: SummarizeAuditEventsInput) {
       action: item.action,
       count: item._count._all,
     })),
+  };
+}
+
+export async function exportAuditEventsCsv(input: ExportAuditEventsCsvInput) {
+  const where = buildWhereClause(input);
+
+  const items = await prisma.auditLog.findMany({
+    where,
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: input.maxRows,
+    select: {
+      id: true,
+      tenantId: true,
+      userId: true,
+      action: true,
+      resource: true,
+      severity: true,
+      payload: true,
+      createdAt: true,
+      user: {
+        select: {
+          name: true,
+          email: true,
+        },
+      },
+    },
+  });
+
+  const rows = items.map((item) => ({
+    id: item.id,
+    tenantId: item.tenantId,
+    userId: item.userId ?? "",
+    userName: item.user?.name ?? "",
+    userEmail: item.user?.email ?? "",
+    action: item.action,
+    resource: item.resource,
+    severity: item.severity,
+    payload: item.payload ?? "",
+    createdAt: item.createdAt.toISOString(),
+  }));
+
+  const headers = [
+    "id",
+    "tenantId",
+    "userId",
+    "userName",
+    "userEmail",
+    "action",
+    "resource",
+    "severity",
+    "payload",
+    "createdAt",
+  ];
+
+  return {
+    csv: toCsv(rows, headers),
+    rowCount: rows.length,
+  };
+}
+
+export async function runAuditRetention(input: RunAuditRetentionInput) {
+  const retentionDays = Math.max(1, Math.trunc(input.retentionDays));
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - retentionDays);
+
+  const where: Prisma.AuditLogWhereInput = {
+    createdAt: {
+      lt: cutoff,
+    },
+    ...(input.tenantId ? { tenantId: input.tenantId } : {}),
+  };
+
+  const eligibleCount = await prisma.auditLog.count({ where });
+
+  if (input.dryRun) {
+    return {
+      retentionDays,
+      cutoff,
+      deletedCount: 0,
+      eligibleCount,
+      dryRun: true,
+      tenantId: input.tenantId ?? null,
+    };
+  }
+
+  const deleted = await prisma.auditLog.deleteMany({ where });
+
+  return {
+    retentionDays,
+    cutoff,
+    deletedCount: deleted.count,
+    eligibleCount,
+    dryRun: false,
+    tenantId: input.tenantId ?? null,
   };
 }

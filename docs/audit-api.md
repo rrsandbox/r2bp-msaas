@@ -126,6 +126,11 @@ Payload de exemplo:
 }
 ```
 
+Para executar delecao real (`dryRun=false`), e obrigatorio informar:
+
+- `confirmDelete: true`
+- `reason` com no minimo 10 caracteres
+
 Resposta de exemplo:
 
 ```json
@@ -149,7 +154,7 @@ Resposta de exemplo:
 Comando local:
 
 - Basico: `npm run audit:retention`
-- Com parametros (Windows PowerShell):
+- Com parametros (Windows PowerShell, default seguro em dry-run):
 
 ```powershell
 $env:AUDIT_RETENTION_DAYS='180'
@@ -159,6 +164,15 @@ npm run audit:retention
 Remove-Item Env:AUDIT_RETENTION_DAYS -ErrorAction SilentlyContinue
 Remove-Item Env:AUDIT_RETENTION_DRY_RUN -ErrorAction SilentlyContinue
 Remove-Item Env:AUDIT_RETENTION_TENANT_ID -ErrorAction SilentlyContinue
+```
+
+Execucao destrutiva (exige confirmacao + motivo):
+
+```powershell
+$env:AUDIT_RETENTION_EXECUTE='true'
+$env:AUDIT_RETENTION_CONFIRM_DELETE='true'
+$env:AUDIT_RETENTION_REASON='retencao semestral aprovada pelo compliance'
+npm run audit:retention
 ```
 
 ## Boas praticas de operacao

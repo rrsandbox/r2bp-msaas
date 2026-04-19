@@ -4,11 +4,14 @@ import { requireAuth } from "@/lib/auth/authorization";
 import { AppError } from "@/lib/errors/app-error";
 import { ErrorCodes } from "@/lib/errors/error-codes";
 import { successResponse, withApiErrorHandling } from "@/lib/http/api-response";
+import { resolveRetentionExecution } from "@/modules/audit/application/audit-retention-policy";
 import { recordAuditEventSafe, runAuditRetention } from "@/modules/audit/application/audit-service";
 
 type RetentionPayload = {
   retentionDays?: number;
   dryRun?: boolean;
+  confirmDelete?: boolean;
+  reason?: string;
   tenantId?: string;
 };
 
@@ -29,14 +32,18 @@ export async function POST(request: Request) {
       }
 
       const payload = (await request.json()) as RetentionPayload;
-      const retentionDays = Number(payload.retentionDays ?? 180);
-      const dryRun = Boolean(payload.dryRun);
-      const tenantId = payload.tenantId?.trim() || undefined;
+      const resolved = resolveRetentionExecution({
+        retentionDays: payload.retentionDays,
+        dryRun: payload.dryRun,
+        confirmDelete: payload.confirmDelete,
+        reason: payload.reason,
+        tenantId: payload.tenantId,
+      });
 
       const result = await runAuditRetention({
-        retentionDays,
-        dryRun,
-        tenantId,
+        retentionDays: resolved.retentionDays,
+        dryRun: resolved.dryRun,
+        tenantId: resolved.tenantId,
       });
 
       await recordAuditEventSafe({
@@ -52,6 +59,7 @@ export async function POST(request: Request) {
           eligibleCount: result.eligibleCount,
           deletedCount: result.deletedCount,
           cutoff: result.cutoff.toISOString(),
+          reason: resolved.reason,
         },
       });
 

@@ -33,6 +33,20 @@ async function filterByPermission(scope: RuntimeScope, items: AppNavigationItem[
   });
 }
 
+function mergeNavigationItems(fallback: AppNavigationItem[], configured: AppNavigationItem[]) {
+  const merged = new Map<string, AppNavigationItem>();
+
+  for (const item of fallback) {
+    merged.set(String(item.href), item);
+  }
+
+  for (const item of configured) {
+    merged.set(String(item.href), item);
+  }
+
+  return Array.from(merged.values());
+}
+
 export async function listNavigationByArea(scope: RuntimeScope, area: NavigationArea) {
   const fallback = fallbackItems(area);
 
@@ -55,10 +69,6 @@ export async function listNavigationByArea(scope: RuntimeScope, area: Navigation
       },
     });
 
-    if (configuredItems.length === 0) {
-      return filterByPermission(scope, fallback);
-    }
-
     const dbItems: AppNavigationItem[] = configuredItems
       .filter((item): item is typeof item & { route: string } => Boolean(item.route))
       .map((item) => ({
@@ -70,7 +80,9 @@ export async function listNavigationByArea(scope: RuntimeScope, area: Navigation
         showInDashboard: area === "dashboard",
       }));
 
-    return filterByPermission(scope, dbItems);
+    const mergedItems = mergeNavigationItems(fallback, dbItems);
+
+    return filterByPermission(scope, mergedItems);
   } catch (error) {
     if (isInfrastructureUnavailableError(error)) {
       return filterByPermission(scope, fallback);

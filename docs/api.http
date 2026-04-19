@@ -240,6 +240,18 @@ Cookie: {{cookie}}
   "dryRun": true
 }
 
+### [22] Auditoria - executar retencao destrutiva (somente SUPER_ADMIN)
+POST {{host}}/api/system/audit/retention
+Content-Type: application/json
+Cookie: {{cookie}}
+
+{
+  "retentionDays": 180,
+  "dryRun": false,
+  "confirmDelete": true,
+  "reason": "Retencao semestral aprovada pelo compliance"
+}
+
 # Uso:
 # 1) Preencha SESSION_TOKEN
 # 2) Opcional: ajuste host

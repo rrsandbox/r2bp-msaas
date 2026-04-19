@@ -3,6 +3,7 @@ import { type AuditSeverity, type Prisma } from "@prisma/client";
 import { prisma } from "@/infra/db/prisma";
 import { isInfrastructureUnavailableError } from "@/lib/errors/infrastructure";
 import { logger } from "@/infra/observability/logger";
+import { toCsv } from "@/modules/audit/application/audit-csv";
 
 type RecordAuditEventInput = {
   tenantId: string;
@@ -65,21 +66,6 @@ function buildWhereClause(input: AuditFiltersInput): Prisma.AuditLogWhereInput {
     userId: input.userId,
     createdAt: Object.keys(createdAt).length > 0 ? createdAt : undefined,
   };
-}
-
-function formatCsvCell(value: unknown) {
-  if (value === null || value === undefined) return "";
-
-  const text = typeof value === "string" ? value : JSON.stringify(value);
-  const escaped = text.replace(/"/g, '""');
-
-  return `"${escaped}"`;
-}
-
-function toCsv(rows: Array<Record<string, unknown>>, headers: string[]) {
-  const headerLine = headers.join(",");
-  const dataLines = rows.map((row) => headers.map((header) => formatCsvCell(row[header])).join(","));
-  return [headerLine, ...dataLines].join("\n");
 }
 
 export async function recordAuditEvent(input: RecordAuditEventInput) {

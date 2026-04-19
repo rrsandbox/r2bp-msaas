@@ -310,6 +310,21 @@ export default async function AuditoriaPage({ searchParams }: AuditoriaPageProps
                         Executar em modo simulacao (nao remove registros)
                       </label>
 
+                      <label className="inline-flex items-center gap-2 text-sm text-muted">
+                        <input type="checkbox" name="confirmDelete" className="size-4 rounded border-border bg-background" />
+                        Confirmo a execucao destrutiva quando dry-run estiver desativado
+                      </label>
+
+                      <label className="text-sm">
+                        Motivo da retencao destrutiva
+                        <textarea
+                          name="reason"
+                          minLength={10}
+                          className="mt-1 min-h-24 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                          placeholder="Ex: politica de retencao semestral de compliance"
+                        />
+                      </label>
+
                       <Button type="submit" variant="secondary">Executar retencao</Button>
                     </form>
                   </CardBody>

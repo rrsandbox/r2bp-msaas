@@ -9,6 +9,7 @@ import { requireAuth } from "@/lib/auth/authorization";
 import { AppError } from "@/lib/errors/app-error";
 import { ErrorCodes } from "@/lib/errors/error-codes";
 import { handleServerActionError } from "@/lib/errors/server-action";
+import { resolveRetentionExecution } from "@/modules/audit/application/audit-retention-policy";
 import { recordAuditEventSafe, runAuditRetention } from "@/modules/audit/application/audit-service";
 
 function readText(formData: FormData, key: string) {
@@ -27,14 +28,18 @@ export async function runAuditRetentionAction(formData: FormData) {
     }
 
     const retentionDaysRaw = readText(formData, "retentionDays");
-    const retentionDays = retentionDaysRaw ? Number(retentionDaysRaw) : 180;
-    const dryRun = formData.get("dryRun") === "on";
-    const targetTenantId = readText(formData, "targetTenantId") || undefined;
+    const resolved = resolveRetentionExecution({
+      retentionDays: retentionDaysRaw ? Number(retentionDaysRaw) : undefined,
+      dryRun: formData.get("dryRun") === "on",
+      confirmDelete: formData.get("confirmDelete") === "on",
+      reason: readText(formData, "reason"),
+      tenantId: readText(formData, "targetTenantId") || undefined,
+    });
 
     const result = await runAuditRetention({
-      retentionDays,
-      dryRun,
-      tenantId: targetTenantId,
+      retentionDays: resolved.retentionDays,
+      dryRun: resolved.dryRun,
+      tenantId: resolved.tenantId,
     });
 
     await recordAuditEventSafe({
@@ -50,6 +55,7 @@ export async function runAuditRetentionAction(formData: FormData) {
         eligibleCount: result.eligibleCount,
         deletedCount: result.deletedCount,
         cutoff: result.cutoff.toISOString(),
+        reason: resolved.reason,
       },
     });
 

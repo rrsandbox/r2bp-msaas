@@ -162,7 +162,7 @@ async function main() {
     },
   });
 
-  const accessFeatureKeys = ["access:read", "access:write", "agenda:read", "agenda:write"];
+  const accessFeatureKeys = ["access:read", "access:write", "agenda:read", "agenda:write", "audit:read"];
   const seededAccessFeatures: Array<{ id: string; key: string }> = [];
   let seededAgendaEventId: string | null = null;
 
